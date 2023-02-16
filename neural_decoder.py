@@ -78,6 +78,23 @@ class NeuralDecoder:
         same = tf.where(y_true == y_pred)
         return tf.shape(same)[0]/tf.shape(y_pred)[0]
 
+    def one_hot(self, y, C):
+        '''One-hot codes the vector of class labels `y`
+
+        Parameters:
+        -----------
+        y: tf.constant. shape=(B,) int-coded class assignments of training mini-batch. 0,...,numClasses-1
+        C: int. Number of unique output classes total
+        off_value: int. The "off" value that represents all other values in each sample's one-hot vector that is not 1.
+
+        Returns:
+        -----------
+        y_one_hot: tf.constant. tf.float32. shape=(B, C) One-hot coded class assignments.
+            e.g. if off_value=-1, y=[1, 0], and C=3, the one-hot vector would be:
+            [[-1., 1., -1.], [-1., 1., -1.]]
+        '''
+        return tf.one_hot(y, C, off_value=0, dtype='float32')
+
     def forward(self, x, net_act=False):
         '''Performs the forward pass through the decoder network with data samples `x`
 
@@ -295,7 +312,7 @@ class SoftmaxDecoder(NeuralDecoder):
         '''
         wts = tf.cast(self.wts, tf.double)
         b = tf.cast(self.b, tf.double)
-        net_in = tf.matmul(x, wts) + b
+        net_in = tf.cast(x, tf.double)@wts + b
 
         return tf.nn.softmax(net_in) if net_act else net_in
 
@@ -340,7 +357,7 @@ class NonlinearDecoder(NeuralDecoder):
         self.loss_exp = loss_exp
 
     def forward(self, x, net_act=False):
-        net_in = tf.matmul(x, self.wts) + self.b
+        net_in = tf.cast(x, tf.float32)@self.wts + self.b
 
         return tf.nn.tanh(tf.math.scalar_mul(self.beta, net_in)) if net_act else net_in
 
