@@ -9,7 +9,7 @@ NOTE: This network should be implemented in Numpy rather than TensorFlow
 import numpy as np
 import matplotlib.pyplot as plt
 from viz import draw_grid_image
-
+import time
 
 class HebbNet:
     '''Single layer bio-inspired neural network in which neurons compete with each other and learning occurs via a
@@ -98,7 +98,16 @@ class HebbNet:
         - Remember arange indexing? It might be useful depending on your implementation strategy.
         - No loops should be needed.
         '''
-        pass
+        netAct = np.zeros(net_in.shape)
+
+        #I'm sorry for bad variables but I think the code miht be worse. Sorts net_in to find minimum values and
+        #then subtracts them to put zeros there. Then I find index of zeros to set equal to inhib_value
+        broIDK = net_in-(np.sort(net_in, axis = 1)[:,-self.kth_place_inhibited]).reshape((net_in.shape[0], 1))
+        netAct[np.arange(net_in.shape[0]), np.where(broIDK == 0)[1]]  = -self.inhib_value
+
+        maxes = np.argmax(net_in, axis = 1)
+        netAct[np.arange(net_in.shape[0]), maxes] = 1
+        return netAct
 
     def update_wts(self, x, net_in, net_act, lr, eps=1e-10):
         '''Update the Hebbian network wts according to a modified Hebbian learning rule (Oja's rule). After each wt
@@ -115,7 +124,11 @@ class HebbNet:
         - This is definitely a scenario where you should the shapes of everything to guide you through and decide on the
         appropriate operation (elementwise multiplication vs matrix multiplication).
         '''
-        pass
+        delta_w = self.wts*np.sum(net_act*net_in)-(x.T@net_act)
+        #closer to instructions but more wrong??
+        #delta_w = np.sum(x.T@net_act)-self.wts*np.sum(net_act*net_in)
+        self.wts = self.wts + lr*delta_w
+        self.wts = self.wts/(np.max(np.abs(self.wts))+eps)
 
     def fit(self, x, n_epochs=1, mini_batch_sz=128, lr=2e-2, plot_wts_live=False, fig_sz=(9, 9), n_wts_plotted=(10, 10),
             print_every=1, save_wts=True):
@@ -144,9 +157,31 @@ class HebbNet:
         if plot_wts_live:
             fig = plt.figure(figsize=fig_sz)
 
-            # should go in training loop
-            if plot_wts_live:
-                draw_grid_image(self.wts.T, n_wts_plotted[0], n_wts_plotted[1], title=f'Net receptive fields (Epoch {e})')
-                fig.canvas.draw()
-            else:
-                print(f'Starting epoch {e}/{n_epochs}')
+
+
+        for i in range(n_epochs):
+            print("epoch: ", i)
+            for j in range(int(np.floor(x.shape[0]/mini_batch_sz))):
+                start = time.time()
+                mini_batch = np.random.choice(np.arange(x.shape[0]), size = (mini_batch_sz), replace = True)
+                batch_data = x[mini_batch]
+
+                net_in = self.net_in(batch_data)
+                net_act = self.net_act(net_in)
+
+                self.update_wts(batch_data, net_in, net_act, lr, )
+
+                total = time.time() - start
+                if i == 0 and j == 0:
+                    print(f"Time take: {total} s")
+                    print(f"Estimated total time: {(total*int(np.floor(x.shape[0]/mini_batch_sz))*n_epochs)/3600} hrs")
+
+                # should go in training loop
+                # if plot_wts_live:
+                #     draw_grid_image(self.wts.T, n_wts_plotted[0], n_wts_plotted[1], title=f'Net receptive fields (Epoch {e})')
+                #     fig.canvas.draw()
+                # else:
+                #     print(f'Starting epoch {e}/{n_epochs}')
+
+        #if saved_wts:
+            #Something something save weights code here
