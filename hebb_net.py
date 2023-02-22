@@ -61,7 +61,7 @@ class HebbNet:
         '''
         self.wts = wts
 
-    def net_in(self, x):
+    def net_in(self, x, verbose=False):
         '''Computes the Hebbian network Dense net_in
 
         Parameters:
@@ -72,6 +72,9 @@ class HebbNet:
         -----------
         netIn: ndarray. shape=(B, H)
         '''
+        if verbose:
+            print(f'{x.shape = }')
+            print(f'{self.wts.shape = }')
         return x@self.wts
 
     def net_act(self, net_in):
@@ -187,11 +190,11 @@ class HebbNet:
             fig = plt.figure(figsize=fig_sz)
 
         for epoch_num in range(n_epochs):
-            if epoch_num % print_every == 0:
-                print("epoch: ", epoch_num)
-            for j in range(int(np.floor(x.shape[0]/mini_batch_sz))):
+
+            num_batches = int(np.floor(N/mini_batch_sz))
+            for j in range(num_batches):
                 start = time.time()
-                mini_batch = np.random.choice(np.arange(x.shape[0]), size=(mini_batch_sz), replace=True)
+                mini_batch = np.random.choice(np.arange(N), size=(mini_batch_sz), replace=True)
                 batch_data = x[mini_batch]
 
                 net_in = self.net_in(batch_data)
@@ -200,12 +203,13 @@ class HebbNet:
                 self.update_wts(batch_data, net_in, net_act, lr)
 
                 total = time.time() - start
-                if epoch_num == 0 and j == 0:
-                    print(f"Time for one epoch: {total} s")
-                    est_time = total * int(np.floor(x.shape[0] / mini_batch_sz)) * n_epochs
+                if epoch_num % print_every == 0 and j == 0:
+                    epochs_remaining = n_epochs - epoch_num
+                    est_time = total * int(np.floor(N / mini_batch_sz)) * epochs_remaining
                     hours, remainder = divmod(est_time, 3600)
                     minutes, seconds = divmod(remainder, 60)
-                    print(f"Estimated total time: {int(hours):02}:{int(minutes):02}:{int(seconds):02}")
+                    print(f'Epoch: {epoch_num}')
+                    print(f"Estimated remaining time: {int(hours):02}:{int(minutes):02}:{int(seconds):02}")
 
             if plot_wts_live:
                 draw_grid_image(self.wts.T, n_wts_plotted[0], n_wts_plotted[1], title=f'Net receptive fields (Epoch {epoch_num})')
