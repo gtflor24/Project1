@@ -109,7 +109,7 @@ class HebbNet:
         netAct[np.arange(net_in.shape[0]), maxes] = 1
         return netAct
 
-    def update_wts(self, x, net_in, net_act, lr, eps=1e-10):
+    def update_wts(self, x, net_in, net_act, lr, eps=1e-10, verbose=False):
         '''Update the Hebbian network wts according to a modified Hebbian learning rule (Oja's rule). After each wt
         update, normalize the wts by the largest wt (in absolute value). See notebook for equations.
 
@@ -124,11 +124,42 @@ class HebbNet:
         - This is definitely a scenario where you should the shapes of everything to guide you through and decide on the
         appropriate operation (elementwise multiplication vs matrix multiplication).
         '''
-        delta_w = self.wts*np.sum(net_act*net_in)-(x.T@net_act)
-        #closer to instructions but more wrong??
-        #delta_w = np.sum(x.T@net_act)-self.wts*np.sum(net_act*net_in)
-        self.wts = self.wts + lr*delta_w
-        self.wts = self.wts/(np.max(np.abs(self.wts))+eps)
+        # x shape: (B, M)
+        # net_act shape: (B, H)
+        # x_net_act shape: (M, H)
+        x_net_act = x.T @ net_act
+        if verbose:
+            print(f'{x.shape = }')
+            print(f'{net_act.shape = }')
+            print(f'{x_net_act.shape = }')
+
+        # net_in shape: (B, H)
+        # net_act shape: (B, H)
+        # net_scalar shape: (H,)
+        combined_net = net_in * net_act
+        net_scalar = np.sum(combined_net, axis=0)
+        if verbose:
+            print(f'{net_in.shape = }')
+            print(f'{net_act.shape = }')
+            print(f'{combined_net.shape = }')
+            print(f'{net_scalar.shape = }')
+
+        # weight_activation shape: (M, H)
+        weight_activation = self.wts * net_scalar
+        if verbose:
+            print(f'{self.wts.shape = }')
+            print(f'{net_scalar.shape = }')
+            print(f'{weight_activation.shape = }')
+
+        # delta_w shape: (M, H)
+        delta_w = x_net_act - weight_activation
+
+        abs_max_weight_change = np.max(np.abs(delta_w))
+        delta_w_scalar = lr / (abs_max_weight_change + eps)
+        self.wts += delta_w_scalar * delta_w
+
+    def save_wts(self):
+        np.save('model_weights.npy', self.wts)
 
     def fit(self, x, n_epochs=1, mini_batch_sz=128, lr=2e-2, plot_wts_live=False, fig_sz=(9, 9), n_wts_plotted=(10, 10),
             print_every=1, save_wts=True):
@@ -157,13 +188,12 @@ class HebbNet:
         if plot_wts_live:
             fig = plt.figure(figsize=fig_sz)
 
-
-
-        for i in range(n_epochs):
-            print("epoch: ", i)
+        for epoch_num in range(n_epochs):
+            if epoch_num % print_every == 0:
+                print("epoch: ", epoch_num)
             for j in range(int(np.floor(x.shape[0]/mini_batch_sz))):
                 start = time.time()
-                mini_batch = np.random.choice(np.arange(x.shape[0]), size = (mini_batch_sz), replace = True)
+                mini_batch = np.random.choice(np.arange(x.shape[0]), size=(mini_batch_sz), replace=True)
                 batch_data = x[mini_batch]
 
                 net_in = self.net_in(batch_data)
@@ -172,16 +202,16 @@ class HebbNet:
                 self.update_wts(batch_data, net_in, net_act, lr, )
 
                 total = time.time() - start
-                if i == 0 and j == 0:
-                    print(f"Time take: {total} s")
-                    print(f"Estimated total time: {(total*int(np.floor(x.shape[0]/mini_batch_sz))*n_epochs)/3600} hrs")
+                if epoch_num == 0 and j == 0:
+                    print(f"Time for one epoch: {total} s")
+                    est_time = total * int(np.floor(x.shape[0] / mini_batch_sz)) * n_epochs
+                    hours, remainder = divmod(est_time, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    print(f"Estimated total time: {int(hours):02}:{int(minutes):02}:{int(seconds):02}")
 
-                # should go in training loop
-                # if plot_wts_live:
-                #     draw_grid_image(self.wts.T, n_wts_plotted[0], n_wts_plotted[1], title=f'Net receptive fields (Epoch {e})')
-                #     fig.canvas.draw()
-                # else:
-                #     print(f'Starting epoch {e}/{n_epochs}')
+            if plot_wts_live:
+                draw_grid_image(self.wts.T, n_wts_plotted[0], n_wts_plotted[1], title=f'Net receptive fields (Epoch {epoch_num})')
+                fig.canvas.draw()
 
-        #if saved_wts:
-            #Something something save weights code here
+        if save_wts:
+            self.save_wts()
