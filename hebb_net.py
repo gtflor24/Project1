@@ -11,11 +11,14 @@ import matplotlib.pyplot as plt
 from viz import draw_grid_image
 import time
 
+
 class HebbNet:
-    '''Single layer bio-inspired neural network in which neurons compete with each other and learning occurs via a
-    variant of Hebbian learning rule (Oja's Rule).
+    '''Single layer bio-inspired neural network in which neurons compete with
+    each other and learning occurs via a variant of Hebbian learning rule
+    (Oja's Rule).
     '''
-    def __init__(self, num_features, num_neurons, wt_minmax=(0., 1.), kth_place_inhibited=6, inhib_value=0.4,
+    def __init__(self, num_features, num_neurons, wt_minmax=(0., 1.),
+                 kth_place_inhibited=6, inhib_value=0.4,
                  load_wts=False, saved_wts_path='export/wts.npy'):
         '''Hebbian network constructor
 
@@ -33,22 +36,17 @@ class HebbNet:
         load_wts: bool. Whether to load weights previously saved off by the network after successful training.
         saved_wts_path: str. Path from the working project directory where the weights previously saved by the net are
             stored. Used if `load_wts` is True.
-
-        TODO:
-        - Create instance variables for the parameters
-        - Initialize the wts.
-            - If loading wts, set the wts by loading the previously saved .npy wt file.
-            - Otherwise, create uniform random weights between the range `wt_minmax`. shape=(M, H).
         '''
         self.num_features = num_features
         self.num_neurons = num_neurons
         self.kth_place_inhibited = kth_place_inhibited
         self.inhib_value = inhib_value
+        self.saved_wts_path = saved_wts_path
 
         if load_wts:
             self.wts = np.load(saved_wts_path)
         else:
-            self.wts = np.random.uniform(low = wt_minmax[0], high = wt_minmax[1], size = (num_features, num_neurons))
+            self.wts = np.random.uniform(low=wt_minmax[0], high=wt_minmax[1], size=(num_features, num_neurons))
 
     def get_wts(self):
         '''Returns the Hebbian network wts'''
@@ -100,12 +98,12 @@ class HebbNet:
         '''
         netAct = np.zeros(net_in.shape)
 
-        #I'm sorry for bad variables but I think the code miht be worse. Sorts net_in to find minimum values and
-        #then subtracts them to put zeros there. Then I find index of zeros to set equal to inhib_value
-        broIDK = net_in-(np.sort(net_in, axis = 1)[:,-self.kth_place_inhibited]).reshape((net_in.shape[0], 1))
-        netAct[np.arange(net_in.shape[0]), np.where(broIDK == 0)[1]]  = -self.inhib_value
+        # I'm sorry for bad variables but I think the code miht be worse. Sorts net_in to find minimum values and
+        # then subtracts them to put zeros there. Then I find index of zeros to set equal to inhib_value
+        broIDK = net_in-(np.sort(net_in, axis=1)[:, -self.kth_place_inhibited]).reshape((net_in.shape[0], 1))
+        netAct[np.arange(net_in.shape[0]), np.where(broIDK == 0)[1]] = -self.inhib_value
 
-        maxes = np.argmax(net_in, axis = 1)
+        maxes = np.argmax(net_in, axis=1)
         netAct[np.arange(net_in.shape[0]), maxes] = 1
         return netAct
 
@@ -159,7 +157,7 @@ class HebbNet:
         self.wts += delta_w_scalar * delta_w
 
     def save_wts(self):
-        np.save('model_weights.npy', self.wts)
+        np.save(self.saved_wts_path, self.wts)
 
     def fit(self, x, n_epochs=1, mini_batch_sz=128, lr=2e-2, plot_wts_live=False, fig_sz=(9, 9), n_wts_plotted=(10, 10),
             print_every=1, save_wts=True):
@@ -199,7 +197,7 @@ class HebbNet:
                 net_in = self.net_in(batch_data)
                 net_act = self.net_act(net_in)
 
-                self.update_wts(batch_data, net_in, net_act, lr, )
+                self.update_wts(batch_data, net_in, net_act, lr)
 
                 total = time.time() - start
                 if epoch_num == 0 and j == 0:
