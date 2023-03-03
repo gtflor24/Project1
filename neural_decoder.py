@@ -261,21 +261,39 @@ class NeuralDecoder:
         recent_val_loss_hist = []
         stop = False
 
+        opt = tf.keras.optimizers.Adam(lr)
+
         for n in range(max_epochs):
+            num_batches = int(np.floor(N/mini_batch_sz))
             t_0 = time.time()
+            for j in range(num_batches):
 
-            with tf.GradientTape() as tape:
-                batch_idx = random.sample(range(0, len(x) - 1), mini_batch_sz)
-                batch_x = self.extract_at_indices(x, batch_idx)
-                batch_y = self.extract_at_indices(one_hot_y, batch_idx)
-                net_in = self.forward(batch_x)
-                loss = self.loss(batch_y, net_in)
-                loss = tf.reduce_mean(loss)
-                train_loss_hist.append(loss)
+                with tf.GradientTape() as tape:
+                    batch_idx = random.sample(range(0, len(x) - 1), mini_batch_sz)
+                    batch_x = self.extract_at_indices(x, batch_idx)
+                    batch_y = self.extract_at_indices(one_hot_y, batch_idx)
 
-            grads = tape.gradient(loss, [self.wts, self.b])
-            opt = tf.keras.optimizers.Adam(lr)
-            opt.apply_gradients(zip(grads, [self.wts, self.b]))
+                    if isinstance(self, NonlinearDecoder):
+                        net_in = self.forward(batch_x, True)
+                    else:
+                        net_in = self.forward(batch_x)
+
+                    loss = self.loss(batch_y, net_in)
+                    loss = tf.reduce_mean(loss)
+                    train_loss_hist.append(loss)
+
+                grads = tape.gradient(loss, [self.wts, self.b])
+                opt.apply_gradients(zip(grads, [self.wts, self.b]))
+
+                if stop:
+                    break
+
+            t = time.time() - t_0
+
+            if n == 0:
+                print (f'Epoch 0/{max_epochs-1} completed \n 1 epoch took {t:.2f} seconds. Expected runtime is {t*(max_epochs-n):.2f} seconds.')
+            elif n % print_every == 0:
+                print (f'Epoch {n}/{max_epochs-1} completed, took {t:.2f} seconds. Approx. {int(t*(max_epochs-n))} seconds remain.')
 
             if verbose and n % val_every == 0:
                 val_net_in = self.forward(x_val)
@@ -284,15 +302,6 @@ class NeuralDecoder:
                 val_loss_hist.append(val_loss)
                 recent_val_loss_hist.append(val_loss)
                 recent_val_loss_hist, stop = self.early_stopping(recent_val_loss_hist, val_loss, patience=patience)
-
-            if stop:
-                break
-
-            t = time.time() - t_0
-            if n == 0:
-                print (f'Epoch 0/{max_epochs-1} completed \n 1 epoch took {t:.2f} seconds. Expected runtime is {t*(max_epochs-n):.2f} seconds.')
-            elif n % print_every == 0:
-                print (f'Epoch {n}/{max_epochs-1} completed, took {t:.2f} seconds. Approx. {int(t*(max_epochs-n))} seconds remain.')
 
         return train_loss_hist, val_loss_hist, n
 

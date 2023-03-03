@@ -1,6 +1,6 @@
 '''hebb_net.py
 Bio-inspired neural network that implements the Hebbian learning rule and competition among neurons in the network
-YOUR NAMES HERE
+Grady and Caleb
 CS443: Bio-Inspired Machine Learning
 Project 1: Hebbian Learning
 
@@ -217,3 +217,90 @@ class HebbNet:
 
         if save_wts:
             self.save_wts()
+
+#Extension Code
+class GHA(HebbNet):
+
+    def __init__(self, num_features, num_neurons):
+        super().__init__(num_features, num_neurons)
+        self.oldWts = None
+
+    def update_wts(self, x, net_in, net_act, lr, eps=1e-10, verbose=False):
+        '''Update the Hebbian network wts according to a modified Hebbian learning rule (Oja's rule). After each wt
+        update, normalize the wts by the largest wt (in absolute value). See notebook for equations.
+
+        Parameters:
+        -----------
+        net_in: ndarray. shape=(B, H)
+        net_act: ndarray. shape=(B, H)
+        lr: float. Learning rate hyperparameter
+        eps: float. Small non-negative number used in the wt normalization step to prevent possible division by 0.
+
+        Tips:
+        - This is definitely a scenario where you should the shapes of everything to guide you through and decide on the
+        appropriate operation (elementwise multiplication vs matrix multiplication).
+        '''
+        self.oldWts = self.wts
+        # x shape: (B, M)
+        # net_act shape: (B, H)
+        # x_net_act shape: (M, H)
+        x_net_act = x.T @ net_act
+        if verbose:
+            print(f'{x.shape = }')
+            print(f'{net_act.shape = }')
+            print(f'{x_net_act.shape = }')
+
+        # delta_w shape: (M, H)
+        delta_w = lr*(x_net_act - self.wts@np.tril(net_act.T@net_act))
+        print(np.sum(self.wts/np.max(self.wts, axis = 1), axis = 1))
+
+        self.wts += delta_w
+
+    def loss(self):
+        return np.linalg.norm(self.wts, order = 'fro')-np.linalg.norm(self.oldWts, order = 'fro')
+
+    def fit(self, x, n_epochs=100, mini_batch_sz=1, lr=2e-2, threshold = 0.1, print_every=1, ):
+        '''Trains the Hebbian network on the training samples `x` using unsupervised Hebbian learning (no y classes required!).
+
+        Parameters:
+        -----------
+        x: ndarray. shape=(N, M). Data samples.
+        n_epochs: int. Number of epochs to train the network.
+        mini_batch_sz: float. Learning rate used with Adam optimizer.
+        lr: float. Learning rate used with Hebbian weight update rule
+        plot_wts_live: bool. Whether to plot the weights and update throughout training every `print_every` epochs.
+        save_wts: bool. Whether to save the Hebbian network wts (to self.saved_wts_path) after training finishes.
+
+        TODO:
+        Very similar workflow to usual:
+        - In each epoch setup mini-batch. You can sample with replacement or without replacement (shuffle) between epochs
+        (your choice).
+        - Compute forward pass for each mini-batch then update the weights.
+        - If plotting the wts on the current epoch, update the plot (via `draw_grid_image`) to show the current wts.
+        - Print out which epoch we are on `print_every` epochs
+        - When training is done, save the wts if `save_wts` is True.
+        '''
+        N = x.shape[-2]
+        M = x.shape[-1]
+
+        for epoch_num in range(n_epochs):
+
+            num_batches = int(np.floor(N/mini_batch_sz))
+            for j in range(num_batches):
+                start = time.time()
+                mini_batch = np.random.choice(np.arange(N), size=(mini_batch_sz), replace=True)
+                batch_data = x[mini_batch]
+
+                net_in = self.net_in(batch_data)
+                net_act = self.net_act(net_in)
+
+                self.update_wts(batch_data, net_in, net_act, lr)
+
+                total = time.time() - start
+                if epoch_num % print_every == 0 and j == 0:
+                    epochs_remaining = n_epochs - epoch_num
+                    est_time = total * int(np.floor(N / mini_batch_sz)) * epochs_remaining
+                    hours, remainder = divmod(est_time, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    print(f'Epoch: {epoch_num}')
+                    print(f"Estimated remaining time: {int(hours):02}:{int(minutes):02}:{int(seconds):02}")
